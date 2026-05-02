@@ -9,7 +9,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "pages:dev": "npm run build && npx wrangler pages dev dist",
-    "pages:deploy": "npm run build && npx wrangler pages deploy dist"
+    "pages:deploy": "npm run build && npx wrangler pages deploy dist --project-name my-dashboard"
   },
   "dependencies": {
     "react": "^19.2.5",
