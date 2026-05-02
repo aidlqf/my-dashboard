@@ -54,7 +54,7 @@ function CoinCard({ name, data }) {
 
       <div className="data-row">
         <span>Volume</span>
-        <strong>{data.volume.toLocaleString()}</strong>
+        <strong>{Number.isFinite(data.volume) ? data.volume.toLocaleString() : "N/A"}</strong>
       </div>
     </div>
   );
@@ -70,13 +70,33 @@ function App() {
       setLoading(true);
       setErrorMessage("");
 
-      const response = await fetch("/data");
+      const response = await fetch("/api/crypto", {
+        headers: {
+          Accept: "application/json"
+        }
+      });
 
-      if (!response.ok) {
-        throw new Error("Failed to load dashboard data");
+      const contentType = response.headers.get("content-type") || "";
+      const responseText = await response.text();
+
+      if (!contentType.includes("application/json")) {
+        throw new Error(
+          `API route returned ${response.status} ${response.statusText || ""} as ${contentType || "unknown content-type"}. ` +
+            `This usually means the Cloudflare Pages Function was not deployed and /api/crypto is returning HTML instead.`
+        );
       }
 
-      const data = await response.json();
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch (parseError) {
+        throw new Error(`API returned invalid JSON: ${parseError.message}`);
+      }
+
+      if (!response.ok) {
+        throw new Error(data.detail || data.error || "Failed to load dashboard data");
+      }
+
       setMarketData(data);
     } catch (error) {
       setErrorMessage(error.message);
@@ -95,7 +115,7 @@ function App() {
         <h1>Crypto Dashboard</h1>
 
         <p className="subtitle">
-          Bitcoin and Ethereum data fetched through a Cloudflare Pages Function.
+          Bitcoin and Ethereum data fetched through a Cloudflare Pages Function at /api/crypto.
         </p>
 
         <button onClick={loadData}>Refresh Data</button>

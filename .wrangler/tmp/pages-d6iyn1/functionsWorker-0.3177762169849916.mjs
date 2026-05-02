@@ -1,59 +1,92 @@
 var __defProp = Object.defineProperty;
 var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
 
-// data.js
+// api/crypto.js
+function jsonResponse(payload, init = {}) {
+  return new Response(JSON.stringify(payload, null, 2), {
+    status: init.status || 200,
+    headers: {
+      "content-type": "application/json; charset=utf-8",
+      "cache-control": "no-store",
+      ...init.headers || {}
+    }
+  });
+}
+__name(jsonResponse, "jsonResponse");
+async function fetchBinanceTicker(symbol) {
+  const url = `https://api.binance.com/api/v3/ticker/24hr?symbol=${encodeURIComponent(symbol)}`;
+  const response = await fetch(url, {
+    headers: {
+      accept: "application/json",
+      "user-agent": "crypto-dashboard-cloudflare-pages-function/1.0"
+    }
+  });
+  const contentType = response.headers.get("content-type") || "";
+  const bodyText = await response.text();
+  let body;
+  if (contentType.includes("application/json")) {
+    try {
+      body = JSON.parse(bodyText);
+    } catch (error) {
+      throw new Error(`Binance returned invalid JSON for ${symbol}: ${error.message}`);
+    }
+  } else {
+    throw new Error(
+      `Binance returned ${response.status} ${response.statusText || ""} with non-JSON content for ${symbol}. First characters: ${bodyText.slice(0, 80)}`
+    );
+  }
+  if (!response.ok) {
+    throw new Error(
+      `Binance request failed for ${symbol}: HTTP ${response.status}. ${body?.msg || body?.message || ""}`.trim()
+    );
+  }
+  return body;
+}
+__name(fetchBinanceTicker, "fetchBinanceTicker");
+function mapTicker(ticker) {
+  return {
+    symbol: ticker.symbol,
+    priceUsd: Number(ticker.lastPrice),
+    changePercent24h: Number(ticker.priceChangePercent),
+    high24h: Number(ticker.highPrice),
+    low24h: Number(ticker.lowPrice),
+    volume: Number(ticker.volume)
+  };
+}
+__name(mapTicker, "mapTicker");
 async function onRequestGet() {
   try {
-    const btcResponse = await fetch(
-      "https://api.binance.com/api/v3/ticker/24hr?symbol=BTCUSDT"
-    );
-    const ethResponse = await fetch(
-      "https://api.binance.com/api/v3/ticker/24hr?symbol=ETHUSDT"
-    );
-    if (!btcResponse.ok || !ethResponse.ok) {
-      return Response.json(
-        {
-          error: "Failed to fetch data from Binance",
-          btcStatus: btcResponse.status,
-          ethStatus: ethResponse.status
-        },
-        { status: 500 }
-      );
-    }
-    const btc = await btcResponse.json();
-    const eth = await ethResponse.json();
-    return Response.json({
+    const [btc, eth] = await Promise.all([
+      fetchBinanceTicker("BTCUSDT"),
+      fetchBinanceTicker("ETHUSDT")
+    ]);
+    return jsonResponse({
       updated: (/* @__PURE__ */ new Date()).toISOString(),
-      bitcoin: {
-        symbol: btc.symbol,
-        priceUsd: Number(btc.lastPrice),
-        changePercent24h: Number(btc.priceChangePercent),
-        high24h: Number(btc.highPrice),
-        low24h: Number(btc.lowPrice),
-        volume: Number(btc.volume)
-      },
-      ethereum: {
-        symbol: eth.symbol,
-        priceUsd: Number(eth.lastPrice),
-        changePercent24h: Number(eth.priceChangePercent),
-        high24h: Number(eth.highPrice),
-        low24h: Number(eth.lowPrice),
-        volume: Number(eth.volume)
-      }
+      source: "Binance 24hr ticker via Cloudflare Pages Function",
+      bitcoin: mapTicker(btc),
+      ethereum: mapTicker(eth)
     });
   } catch (error) {
-    return Response.json(
+    return jsonResponse(
       {
-        error: error.message
+        error: "Failed to fetch crypto market data",
+        detail: error instanceof Error ? error.message : String(error)
       },
-      { status: 500 }
+      { status: 502 }
     );
   }
 }
 __name(onRequestGet, "onRequestGet");
 
-// ../.wrangler/tmp/pages-SF3W6L/functionsRoutes-0.5024013822540176.mjs
+// ../.wrangler/tmp/pages-d6iyn1/functionsRoutes-0.020481411291924934.mjs
 var routes = [
+  {
+    routePath: "/api/crypto",
+    mountPath: "/api",
+    method: "GET",
+    middlewares: [],
+    modules: [onRequestGet]
+  },
   {
     routePath: "/data",
     mountPath: "/",
@@ -550,7 +583,7 @@ var jsonError = /* @__PURE__ */ __name(async (request, env, _ctx, middlewareCtx)
 }, "jsonError");
 var middleware_miniflare3_json_error_default = jsonError;
 
-// ../.wrangler/tmp/bundle-h5I9dz/middleware-insertion-facade.js
+// ../.wrangler/tmp/bundle-yCwtWP/middleware-insertion-facade.js
 var __INTERNAL_WRANGLER_MIDDLEWARE__ = [
   middleware_ensure_req_body_drained_default,
   middleware_miniflare3_json_error_default
@@ -582,7 +615,7 @@ function __facade_invoke__(request, env, ctx, dispatch, finalMiddleware) {
 }
 __name(__facade_invoke__, "__facade_invoke__");
 
-// ../.wrangler/tmp/bundle-h5I9dz/middleware-loader.entry.ts
+// ../.wrangler/tmp/bundle-yCwtWP/middleware-loader.entry.ts
 var __Facade_ScheduledController__ = class ___Facade_ScheduledController__ {
   constructor(scheduledTime, cron, noRetry) {
     this.scheduledTime = scheduledTime;
@@ -682,4 +715,4 @@ export {
   __INTERNAL_WRANGLER_MIDDLEWARE__,
   middleware_loader_entry_default as default
 };
-//# sourceMappingURL=functionsWorker-0.724899364926674.mjs.map
+//# sourceMappingURL=functionsWorker-0.3177762169849916.mjs.map
