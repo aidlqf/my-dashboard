@@ -3,5 +3,6 @@
 # Build command: npm run build
 # Build output directory: dist
 # Root directory: /
-pages_build_output_dir = "dist"
+name = "my-dashboard"
+pages_build_output_dir = "./dist"
 compatibility_date = "2026-05-02"
